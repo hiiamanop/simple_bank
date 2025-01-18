@@ -16,6 +16,8 @@ jobs:
           POSTGRES_USER: root
           POSTGRES_PASSWORD: root
           POSTGRES_DB: simple_bank
+        ports:
+          - 5432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -38,6 +40,18 @@ jobs:
 
       - name: Run migration
         run: make migrateup
+        env:
+          DB_HOST: localhost
+          DB_USER: root
+          DB_PASSWORD: root
+          DB_NAME: simple_bank
+          DB_PORT: 5432
 
       - name: Test
         run: make test
+        env:
+          DB_HOST: localhost
+          DB_USER: root
+          DB_PASSWORD: root
+          DB_NAME: simple_bank
+          DB_PORT: 5432
