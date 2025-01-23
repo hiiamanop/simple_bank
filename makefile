@@ -19,4 +19,7 @@ test:
 start: 
 	docker exec -it postgres psql -U root -d simple_bank
 
-.PHONY: createdb dropdb migrateup migratedown sqlc test start
+server:
+	go run main.go
+
+.PHONY: createdb dropdb migrateup migratedown sqlc test start server
