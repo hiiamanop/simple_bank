@@ -6,11 +6,17 @@ import (
 
 	"github.com/hiiamanop/simple_bank/api"
 	db "github.com/hiiamanop/simple_bank/db/sqlc"
+	"github.com/hiiamanop/simple_bank/util"
 	_ "github.com/lib/pq"
 )
 
 func main() {
-	dbConn, err := sql.Open("postgres", "postgresql://root:root@localhost:5432/simple_bank?sslmode=disable")
+	config, err := util.LoadConfig(".")
+	if err != nil {
+		log.Fatal("cannot load config", err)
+	}
+
+	dbConn, err := sql.Open(config.DBDriver, config.DBSource)
 	if err != nil {
 		log.Fatal("cannot connect to db:", err)
 	}
@@ -18,7 +24,7 @@ func main() {
 	store := db.NewStore(dbConn)
 	server := api.NewServer(store)
 
-	err = server.Start(":8080")
+	err = server.Start(config.ServerAddress)
 	if err != nil {
 		log.Fatal("cannot start server:", err)
 	}

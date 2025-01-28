@@ -8,34 +8,33 @@ import (
 	db "github.com/hiiamanop/simple_bank/db/sqlc"
 )
 
-type createAccountRequest struct {
-	Owner    string `json:"owner" binding:"required"`
-	Currency string `json:"currency" binding:"required,oneof=USD EUR"`
+type createEntryRequest struct {
+	AccountID int64 `json:"account_id" binding:"required,min=1"`
+	Amount    int64 `json:"amount" binding:"required"`
 }
 
-func (server *Server) createAccount(ctx *gin.Context) {
-	var req createAccountRequest
+func (server *Server) createEntry(ctx *gin.Context) {
+	var req createEntryRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
 
-	arg := db.CreateAccountParams{
-		Owner:    req.Owner,
-		Currency: db.Currency(req.Currency),
-		Balance:  0,
+	arg := db.CreateEntriesParams{
+		AccountID: req.AccountID,
+		Amount:    req.Amount,
 	}
 
-	account, err := server.store.CreateAccount(ctx, arg)
+	entry, err := server.store.CreateEntries(ctx, arg)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, account)
+	ctx.JSON(http.StatusOK, entry)
 }
 
-func (server *Server) getAccount(ctx *gin.Context) {
+func (server *Server) getEntry(ctx *gin.Context) {
 	var req struct {
 		ID int64 `uri:"id" binding:"required,min=1"`
 	}
@@ -45,7 +44,7 @@ func (server *Server) getAccount(ctx *gin.Context) {
 		return
 	}
 
-	account, err := server.store.GetAccount(ctx, req.ID)
+	entry, err := server.store.GetEntries(ctx, req.ID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			ctx.JSON(http.StatusNotFound, errorResponse(err))
@@ -55,41 +54,40 @@ func (server *Server) getAccount(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, account)
+	ctx.JSON(http.StatusOK, entry)
 }
 
-type listAccountsRequest struct {
+type listEntriesRequest struct {
 	PageID   int32 `form:"page_id" binding:"required,min=1"`
 	PageSize int32 `form:"page_size" binding:"required,min=5,max=10"`
 }
 
-func (server *Server) listAccounts(ctx *gin.Context) {
-	var req listAccountsRequest
+func (server *Server) listEntries(ctx *gin.Context) {
+	var req listEntriesRequest
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
 
-	arg := db.ListAccountsParams{
+	arg := db.ListEntriesParams{
 		Limit:  req.PageSize,
 		Offset: (req.PageID - 1) * req.PageSize,
 	}
 
-	accounts, err := server.store.ListAccounts(ctx, arg)
+	entries, err := server.store.ListEntries(ctx, arg)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, accounts)
+	ctx.JSON(http.StatusOK, entries)
 }
 
-type updateAccountRequest struct {
-	Balance int64 `json:"balance" binding:"required,min=0"`
+type updateEntryRequest struct {
+	Amount int64 `json:"amount" binding:"required"`
 }
 
-func (server *Server) updateAccount(ctx *gin.Context) {
-	// Get ID from URI
+func (server *Server) updateEntry(ctx *gin.Context) {
 	var reqURI struct {
 		ID int64 `uri:"id" binding:"required,min=1"`
 	}
@@ -98,15 +96,18 @@ func (server *Server) updateAccount(ctx *gin.Context) {
 		return
 	}
 
-	// Get update data from body
-	var reqBody updateAccountRequest
+	var reqBody updateEntryRequest
 	if err := ctx.ShouldBindJSON(&reqBody); err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
 
-	// Get account first to check if exists
-	account, err := server.store.GetAccount(ctx, reqURI.ID)
+	arg := db.UpdateEntriesParams{
+		ID:     reqURI.ID,
+		Amount: reqBody.Amount,
+	}
+
+	entry, err := server.store.UpdateEntries(ctx, arg)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			ctx.JSON(http.StatusNotFound, errorResponse(err))
@@ -116,22 +117,10 @@ func (server *Server) updateAccount(ctx *gin.Context) {
 		return
 	}
 
-	// Update balance
-	arg := db.AddAccountBalanceParams{
-		ID:     reqURI.ID,
-		Amount: reqBody.Balance - account.Balance,
-	}
-
-	account, err = server.store.AddAccountBalance(ctx, arg)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
-	}
-
-	ctx.JSON(http.StatusOK, account)
+	ctx.JSON(http.StatusOK, entry)
 }
 
-func (server *Server) deleteAccount(ctx *gin.Context) {
+func (server *Server) deleteEntry(ctx *gin.Context) {
 	var req struct {
 		ID int64 `uri:"id" binding:"required,min=1"`
 	}
@@ -141,7 +130,7 @@ func (server *Server) deleteAccount(ctx *gin.Context) {
 		return
 	}
 
-	err := server.store.DeleteAccount(ctx, req.ID)
+	err := server.store.DeleteEntries(ctx, req.ID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			ctx.JSON(http.StatusNotFound, errorResponse(err))
@@ -151,5 +140,5 @@ func (server *Server) deleteAccount(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"message": "Account deleted successfully"})
+	ctx.JSON(http.StatusOK, gin.H{"message": "Entry deleted successfully"})
 }

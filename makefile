@@ -22,4 +22,7 @@ start:
 server:
 	go run main.go
 
-.PHONY: createdb dropdb migrateup migratedown sqlc test start server
+mock: 
+	mockgen -package mockdb -destination db/mock/store.go github.com/hiiamanop/simple_bank/db/sqlc Store 
+
+.PHONY: createdb dropdb migrateup migratedown sqlc test start server mock
