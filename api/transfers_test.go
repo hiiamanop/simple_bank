@@ -38,21 +38,21 @@ func TestCreateTransfer(t *testing.T) {
 		ID:       int64(util.RandomInt(1, 1000)),
 		Owner:    util.RandomOwner(),
 		Balance:  int64(util.RandomMoney()),
-		Currency: db.Currency("USD"),
+		Currency: "USD",
 	}
 
 	toAccount := db.Account{
 		ID:       int64(util.RandomInt(1, 1000)),
 		Owner:    util.RandomOwner(),
 		Balance:  int64(util.RandomMoney()),
-		Currency: db.Currency("USD"),
+		Currency: "USD",
 	}
 
 	wrongCurrencyAccount := db.Account{
 		ID:       int64(util.RandomInt(1, 1000)),
 		Owner:    util.RandomOwner(),
 		Balance:  int64(util.RandomMoney()),
-		Currency: db.Currency("EUR"),
+		Currency: "EUR",
 	}
 
 	transfer := db.Transfer{

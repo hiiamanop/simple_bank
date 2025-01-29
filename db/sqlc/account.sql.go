@@ -39,9 +39,9 @@ INSERT INTO account (owner, balance, currency) VALUES ($1, $2, $3) RETURNING id,
 `
 
 type CreateAccountParams struct {
-	Owner    string   `json:"owner"`
-	Balance  int64    `json:"balance"`
-	Currency Currency `json:"currency"`
+	Owner    string      `json:"owner"`
+	Balance  int64       `json:"balance"`
+	Currency interface{} `json:"currency"`
 }
 
 // Create a new account

@@ -1,3 +1,4 @@
-DROP TABLE "transfers";
-DROP TABLE "entries";
-DROP TABLE "account";
+DROP TABLE IF EXISTS "transfers";
+DROP TABLE IF EXISTS "entries";
+DROP TABLE IF EXISTS "account";
+DROP TYPE IF EXISTS "currency";

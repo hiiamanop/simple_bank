@@ -122,7 +122,7 @@ func createRandomAccount(t *testing.T) Account {
 	arg := CreateAccountParams{
 		Owner:    randomString(6),
 		Balance:  randomInt(0, 1000),
-		Currency: Currency(randomCurrency()),
+		Currency: randomCurrency(),
 	}
 
 	account, err := testQueries.CreateAccount(context.Background(), arg)

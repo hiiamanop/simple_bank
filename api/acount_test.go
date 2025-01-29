@@ -545,7 +545,7 @@ func RandomAccount() db.Account {
 		ID:       int64(util.RandomInt(1, 1000)),
 		Owner:    util.RandomOwner(),
 		Balance:  int64(util.RandomMoney()),
-		Currency: db.Currency(util.RandomCurrency()),
+		Currency: util.RandomCurrency(),
 	}
 }
 
