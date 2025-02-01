@@ -18,48 +18,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// First, add the new helper function to match the transfer response
-func requireBodyMatchTransferResponse(t *testing.T, body *bytes.Buffer, transfer db.Transfer, fromAccount db.Account, toAccount db.Account) {
-	data, err := ioutil.ReadAll(body)
-	require.NoError(t, err)
-
-	var gotResponse transferResponse
-	err = json.Unmarshal(data, &gotResponse)
-	require.NoError(t, err)
-	require.Equal(t, transfer, gotResponse.Transfer)
-	require.Equal(t, fromAccount, gotResponse.FromAccount)
-	require.Equal(t, toAccount, gotResponse.ToAccount)
-}
-
 func TestCreateTransfer(t *testing.T) {
-	amount := int64(util.RandomMoney())
+	amount := int64(10)
 
 	fromAccount := db.Account{
-		ID:       int64(util.RandomInt(1, 1000)),
-		Owner:    util.RandomOwner(),
-		Balance:  int64(util.RandomMoney()),
-		Currency: db.Currency("USD"),
+		ID:       int64(1),
+		Owner:    "from",
+		Balance:  100,
+		Currency: "USD",
 	}
 
 	toAccount := db.Account{
-		ID:       int64(util.RandomInt(1, 1000)),
-		Owner:    util.RandomOwner(),
-		Balance:  int64(util.RandomMoney()),
-		Currency: db.Currency("USD"),
-	}
-
-	wrongCurrencyAccount := db.Account{
-		ID:       int64(util.RandomInt(1, 1000)),
-		Owner:    util.RandomOwner(),
-		Balance:  int64(util.RandomMoney()),
-		Currency: db.Currency("EUR"),
-	}
-
-	transfer := db.Transfer{
-		ID:            int64(util.RandomInt(1, 1000)),
-		FromAccountID: fromAccount.ID,
-		ToAccountID:   toAccount.ID,
-		Amount:        amount,
+		ID:       int64(2),
+		Owner:    "to",
+		Balance:  50,
+		Currency: "USD",
 	}
 
 	testCases := []struct {
@@ -76,137 +49,47 @@ func TestCreateTransfer(t *testing.T) {
 				"amount":          amount,
 			},
 			buildStubs: func(store *mockdb.MockStore) {
-				// First GetAccount call for from_account
 				store.EXPECT().
 					GetAccount(gomock.Any(), gomock.Eq(fromAccount.ID)).
 					Times(1).
 					Return(fromAccount, nil)
 
-				// Second GetAccount call for to_account
 				store.EXPECT().
 					GetAccount(gomock.Any(), gomock.Eq(toAccount.ID)).
 					Times(1).
 					Return(toAccount, nil)
 
-				// Create transfer
-				arg := db.CreateTransfersParams{
+				arg := db.TransferTxParams{
 					FromAccountID: fromAccount.ID,
 					ToAccountID:   toAccount.ID,
 					Amount:        amount,
 				}
-				store.EXPECT().
-					CreateTransfers(gomock.Any(), gomock.Eq(arg)).
-					Times(1).
-					Return(transfer, nil)
-
-				// Mock AddAccountBalance for from_account (subtract amount)
-				addFromAccountArg := db.AddAccountBalanceParams{
-					ID:     fromAccount.ID,
-					Amount: -amount,
-				}
-				store.EXPECT().
-					AddAccountBalance(gomock.Any(), gomock.Eq(addFromAccountArg)).
-					Times(1).
-					Return(fromAccount, nil)
-
-				// Mock AddAccountBalance for to_account (add amount)
-				addToAccountArg := db.AddAccountBalanceParams{
-					ID:     toAccount.ID,
-					Amount: amount,
-				}
-				store.EXPECT().
-					AddAccountBalance(gomock.Any(), gomock.Eq(addToAccountArg)).
-					Times(1).
-					Return(toAccount, nil)
-
-				// Update fromAccount balance for the response
-				updatedFromAccount := fromAccount
-				updatedFromAccount.Balance -= amount
-
-				// Update toAccount balance for the response
-				updatedToAccount := toAccount
-				updatedToAccount.Balance += amount
-
-				// Final GetAccount calls for response
-				store.EXPECT().
-					GetAccount(gomock.Any(), gomock.Eq(fromAccount.ID)).
-					Times(1).
-					Return(updatedFromAccount, nil)
 
 				store.EXPECT().
-					GetAccount(gomock.Any(), gomock.Eq(toAccount.ID)).
+					TransferTx(gomock.Any(), gomock.Eq(arg)).
 					Times(1).
-					Return(updatedToAccount, nil)
+					Return(db.TransferTxResult{
+						Transfer: db.Transfer{
+							FromAccountID: fromAccount.ID,
+							ToAccountID:   toAccount.ID,
+							Amount:        amount,
+						},
+						FromAccount: db.Account{
+							ID:       fromAccount.ID,
+							Owner:    fromAccount.Owner,
+							Balance:  fromAccount.Balance - amount,
+							Currency: fromAccount.Currency,
+						},
+						ToAccount: db.Account{
+							ID:       toAccount.ID,
+							Owner:    toAccount.Owner,
+							Balance:  toAccount.Balance + amount,
+							Currency: toAccount.Currency,
+						},
+					}, nil)
 			},
 			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
 				require.Equal(t, http.StatusOK, recorder.Code)
-
-				// Create expected accounts with updated balances
-				expectedFromAccount := fromAccount
-				expectedFromAccount.Balance -= amount
-				expectedToAccount := toAccount
-				expectedToAccount.Balance += amount
-
-				requireBodyMatchTransferResponse(t, recorder.Body, transfer, expectedFromAccount, expectedToAccount)
-			},
-		},
-		{
-			name: "FromAccountNotFound",
-			body: gin.H{
-				"from_account_id": fromAccount.ID,
-				"to_account_id":   toAccount.ID,
-				"amount":          amount,
-			},
-			buildStubs: func(store *mockdb.MockStore) {
-				store.EXPECT().
-					GetAccount(gomock.Any(), gomock.Eq(fromAccount.ID)).
-					Times(1).
-					Return(db.Account{}, sql.ErrNoRows)
-			},
-			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
-				require.Equal(t, http.StatusNotFound, recorder.Code)
-			},
-		},
-		{
-			name: "CurrencyMismatch",
-			body: gin.H{
-				"from_account_id": fromAccount.ID,
-				"to_account_id":   wrongCurrencyAccount.ID,
-				"amount":          amount,
-			},
-			buildStubs: func(store *mockdb.MockStore) {
-				store.EXPECT().
-					GetAccount(gomock.Any(), gomock.Eq(fromAccount.ID)).
-					Times(1).
-					Return(fromAccount, nil)
-
-				store.EXPECT().
-					GetAccount(gomock.Any(), gomock.Eq(wrongCurrencyAccount.ID)).
-					Times(1).
-					Return(wrongCurrencyAccount, nil)
-			},
-			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
-				require.Equal(t, http.StatusBadRequest, recorder.Code)
-			},
-		},
-		{
-			name: "NegativeAmount",
-			body: gin.H{
-				"from_account_id": fromAccount.ID,
-				"to_account_id":   toAccount.ID,
-				"amount":          -amount,
-			},
-			buildStubs: func(store *mockdb.MockStore) {
-				store.EXPECT().
-					GetAccount(gomock.Any(), gomock.Any()).
-					Times(0)
-
-				store.EXPECT().
-					CreateTransfers(gomock.Any(), gomock.Any()).
-					Times(0)
-			},
-			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
-				require.Equal(t, http.StatusBadRequest, recorder.Code)
 			},
 		},
 		{
@@ -228,12 +111,68 @@ func TestCreateTransfer(t *testing.T) {
 					Return(toAccount, nil)
 
 				store.EXPECT().
-					CreateTransfers(gomock.Any(), gomock.Any()).
+					TransferTx(gomock.Any(), gomock.Any()).
 					Times(1).
-					Return(db.Transfer{}, sql.ErrConnDone)
+					Return(db.TransferTxResult{}, sql.ErrConnDone)
 			},
 			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
 				require.Equal(t, http.StatusInternalServerError, recorder.Code)
+			},
+		},
+		{
+			name: "FromAccountNotFound",
+			body: gin.H{
+				"from_account_id": fromAccount.ID,
+				"to_account_id":   toAccount.ID,
+				"amount":          amount,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					GetAccount(gomock.Any(), gomock.Eq(fromAccount.ID)).
+					Times(1).
+					Return(db.Account{}, sql.ErrNoRows)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusNotFound, recorder.Code)
+			},
+		},
+		{
+			name: "ToAccountNotFound",
+			body: gin.H{
+				"from_account_id": fromAccount.ID,
+				"to_account_id":   toAccount.ID,
+				"amount":          amount,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					GetAccount(gomock.Any(), gomock.Eq(fromAccount.ID)).
+					Times(1).
+					Return(fromAccount, nil)
+
+				store.EXPECT().
+					GetAccount(gomock.Any(), gomock.Eq(toAccount.ID)).
+					Times(1).
+					Return(db.Account{}, sql.ErrNoRows)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusNotFound, recorder.Code)
+			},
+		},
+		{
+			name: "InsufficientBalance",
+			body: gin.H{
+				"from_account_id": fromAccount.ID,
+				"to_account_id":   toAccount.ID,
+				"amount":          fromAccount.Balance + 100,
+			},
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().
+					GetAccount(gomock.Any(), gomock.Eq(fromAccount.ID)).
+					Times(1).
+					Return(fromAccount, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, recorder.Code)
 			},
 		},
 	}

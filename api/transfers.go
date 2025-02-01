@@ -29,6 +29,7 @@ func (server *Server) createTransfer(ctx *gin.Context) {
 		return
 	}
 
+	// Validate from account exists and has sufficient balance
 	fromAccount, err := server.store.GetAccount(ctx, req.FromAccountID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -47,6 +48,7 @@ func (server *Server) createTransfer(ctx *gin.Context) {
 		return
 	}
 
+	// Validate to account exists
 	toAccount, err := server.store.GetAccount(ctx, req.ToAccountID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -57,6 +59,7 @@ func (server *Server) createTransfer(ctx *gin.Context) {
 		return
 	}
 
+	// Validate currencies match
 	if fromAccount.Currency != toAccount.Currency {
 		err := fmt.Errorf(
 			"currency mismatch: from account [%d] currency %s vs to account [%d] currency %s",
@@ -69,45 +72,23 @@ func (server *Server) createTransfer(ctx *gin.Context) {
 		return
 	}
 
-	// Create the transfer
-	arg := db.CreateTransfersParams{
+	// Execute transfer transaction
+	arg := db.TransferTxParams{
 		FromAccountID: req.FromAccountID,
 		ToAccountID:   req.ToAccountID,
 		Amount:        req.Amount,
 	}
 
-	transfer, err := server.store.CreateTransfers(ctx, arg)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
-	}
-
-	// Update from_account balance
-	fromAccountArg := db.AddAccountBalanceParams{
-		ID:     req.FromAccountID,
-		Amount: -req.Amount, // Subtract the amount
-	}
-	fromAccount, err = server.store.AddAccountBalance(ctx, fromAccountArg)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
-		return
-	}
-
-	// Update to_account balance
-	toAccountArg := db.AddAccountBalanceParams{
-		ID:     req.ToAccountID,
-		Amount: req.Amount, // Add the amount
-	}
-	toAccount, err = server.store.AddAccountBalance(ctx, toAccountArg)
+	result, err := server.store.TransferTx(ctx, arg)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
 
 	response := transferResponse{
-		Transfer:    transfer,
-		FromAccount: fromAccount,
-		ToAccount:   toAccount,
+		Transfer:    result.Transfer,
+		FromAccount: result.FromAccount,
+		ToAccount:   result.ToAccount,
 	}
 
 	ctx.JSON(http.StatusOK, response)
