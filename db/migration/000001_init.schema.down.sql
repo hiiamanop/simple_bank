@@ -16,7 +16,7 @@ DROP INDEX IF EXISTS "account_owner_idx";
 DROP TABLE IF EXISTS "transfers";
 DROP TABLE IF EXISTS "entries";
 DROP TABLE IF EXISTS "account";
-DROP TABLE IF EXISTS "User";
+DROP TABLE IF EXISTS "users";
 
 -- Drop custom types
 DROP TYPE IF EXISTS "currency";

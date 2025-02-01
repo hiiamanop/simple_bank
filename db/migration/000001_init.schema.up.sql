@@ -3,7 +3,7 @@ CREATE TYPE "currency" AS ENUM (
   'EUR'
 );
 
-CREATE TABLE "User" (
+CREATE TABLE "users" (
   "username" varchar PRIMARY KEY,
   "hashed_password" varchar NOT NULL,
   "fullname" varchar NOT NULL,
@@ -51,7 +51,7 @@ COMMENT ON COLUMN "entries"."amount" IS 'can be a positive or negative';
 
 COMMENT ON COLUMN "transfers"."amount" IS 'must be positive';
 
-ALTER TABLE "account" ADD FOREIGN KEY ("owner") REFERENCES "User" ("username");
+ALTER TABLE "account" ADD FOREIGN KEY ("owner") REFERENCES "users" ("username");
 
 ALTER TABLE "entries" ADD FOREIGN KEY ("account_id") REFERENCES "account" ("id");
 

@@ -1,6 +1,7 @@
 package util
 
 import (
+	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -43,4 +44,31 @@ func RandomCurrency() string {
 	currencies := []string{"USD", "EUR"}
 	n := len(currencies)
 	return currencies[rand.Intn(n)]
+}
+
+func RandomEmail() string {
+	// Simple set of characters for username generation
+	const letters = "abcdefghijklmnopqrstuvwxyz"
+	const numbers = "0123456789"
+
+	// Basic domains
+	domains := []string{"gmail.com", "yahoo.com", "hotmail.com"}
+
+	// Generate random username length between 5 and 10
+	length := rand.Intn(6) + 5
+
+	// Build random username
+	username := make([]byte, length)
+	for i := 0; i < length; i++ {
+		if rand.Float32() < 0.7 { // 70% chance of letter
+			username[i] = letters[rand.Intn(len(letters))]
+		} else { // 30% chance of number
+			username[i] = numbers[rand.Intn(len(numbers))]
+		}
+	}
+
+	// Pick random domain
+	domain := domains[rand.Intn(len(domains))]
+
+	return fmt.Sprintf("%s@%s", string(username), domain)
 }

@@ -119,8 +119,10 @@ func TestDeleteAccount(t *testing.T) {
 
 // Helper function to create a random account
 func createRandomAccount(t *testing.T) Account {
+	user := createRandomUser(t)
+
 	arg := CreateAccountParams{
-		Owner:    randomString(6),
+		Owner:    user.Username,
 		Balance:  randomInt(0, 1000),
 		Currency: Currency(randomCurrency()),
 	}
