@@ -76,6 +76,16 @@ func (server *Server) setupRouter() {
 			transfers.PUT("/:id", server.updateTransfer)
 			transfers.DELETE("/:id", server.deleteTransfer)
 		}
+
+		// Transfer routes
+		users := v1.Group("/users")
+		{
+			users.POST("", server.createUser)
+			users.GET("/:username", server.getUser)
+			// users.GET("", server.listusers)
+			// users.PUT("/:id", server.updateuser)
+			// users.DELETE("/:id", server.deleteuser)
+		}
 	}
 }
 

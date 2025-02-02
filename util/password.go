@@ -8,11 +8,7 @@ import (
 
 // HashPassword hashes a password using bcrypt
 func HashPassword(password string) (string, error) {
-	// Convert password to []byte
-	passwordBytes := []byte(password)
-
-	// Hash the password with a default cost of 12
-	hashedPassword, err := bcrypt.GenerateFromPassword(passwordBytes, bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return "", fmt.Errorf("failed to hash password: %w", err)
 	}
