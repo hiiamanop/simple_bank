@@ -1,43 +1,56 @@
 package api
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	db "github.com/hiiamanop/simple_bank/db/sqlc"
+	"github.com/hiiamanop/simple_bank/token"
+	"github.com/hiiamanop/simple_bank/util"
 )
 
 // Server serves HTTP requests for our banking service
 type Server struct {
-	store  db.Store
-	router *gin.Engine
+	store      db.Store
+	tokenMaker token.Maker
+	router     *gin.Engine
+	config     util.Config
 }
 
 // NewServer creates a new HTTP server and setup routing
-func NewServer(store db.Store) *Server {
+func NewServer(config util.Config, store db.Store) (*Server, error) {
+	tokenMaker, err := token.NewPasetoMaker(config.TokenSymetricKey)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create token maker: %v", err)
+	}
+
 	server := &Server{
-		store:  store,
-		router: gin.Default(),
+		config:     config,
+		store:      store,
+		tokenMaker: tokenMaker,
+		router:     gin.Default(),
 	}
 
 	// Add CORS middleware with more permissive settings
-	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"http://localhost:3000"}
-	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"}
-	config.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}
-	config.AllowCredentials = true
-	config.ExposeHeaders = []string{"Content-Length"}
-	// Important: Enable CORS preflight requests
-	config.AllowWildcard = true
-	config.MaxAge = 12 * time.Hour
+	corsConfig := cors.DefaultConfig()
+	corsConfig.AllowOrigins = []string{"*"}
+	corsConfig.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"}
+	corsConfig.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}
+	corsConfig.AllowCredentials = true
+	corsConfig.ExposeHeaders = []string{"Content-Length"}
+	// Important: Enable CORS preflight requests by allowing wildcard origins
+	// This is necessary for handling requests from different origins during development
+	corsConfig.AllowWildcard = true
+	corsConfig.MaxAge = 12 * time.Hour
 
-	server.router.Use(cors.New(config))
+	server.router.Use(cors.New(corsConfig))
 
 	// setup routing
 	server.setupRouter()
 
-	return server
+	return server, nil
 }
 
 func (server *Server) setupRouter() {
@@ -77,10 +90,11 @@ func (server *Server) setupRouter() {
 			transfers.DELETE("/:id", server.deleteTransfer)
 		}
 
-		// Transfer routes
+		// User routes
 		users := v1.Group("/users")
 		{
 			users.POST("", server.createUser)
+			users.POST("/login", server.loginUser)
 			users.GET("/:username", server.getUser)
 			// users.GET("", server.listusers)
 			// users.PUT("/:id", server.updateuser)
