@@ -1,9 +1,9 @@
 package token
 
 import (
+	"fmt"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/google/uuid"
 )
 
@@ -17,25 +17,34 @@ type Payload struct {
 
 // NewPayload creates a now token payload with a specific username and duration
 func NewPayload(username string, duration time.Duration) (*Payload, error) {
-	tokenID, err := uuid.NewRandom()
-	if err != nil {
-		return nil, err
-	}
+	fmt.Printf("NewPayload called with duration: %v\n", duration) // Add this
+
+	now := time.Now()
+	expiredAt := now.Add(duration) // Make sure this line exists
 
 	payload := &Payload{
-		ID:        tokenID,
 		Username:  username,
-		IssuedAt:  time.Now(),
-		ExpiredAt: time.Now().Add(duration),
+		IssuedAt:  now,
+		ExpiredAt: expiredAt, // Not the same as IssuedAt!
 	}
+
+	fmt.Printf("Payload created with duration %v:\n", duration)
+	fmt.Printf("IssuedAt:  %v\n", payload.IssuedAt)
+	fmt.Printf("ExpiredAt: %v\n", payload.ExpiredAt)
+
 	return payload, nil
 }
 
 // valid check
 // Add this method to implement jwt.Claims interface
 func (payload *Payload) Valid() error {
-	if time.Now().After(payload.ExpiredAt) {
-		return jwt.NewValidationError("token has expired", jwt.ValidationErrorExpired)
+	now := time.Now()
+	fmt.Printf("Validating token at: %v\n", now)
+	fmt.Printf("Token expires at: %v\n", payload.ExpiredAt)
+
+	if now.After(payload.ExpiredAt) {
+		fmt.Printf("Token is expired by %v\n", now.Sub(payload.ExpiredAt))
+		return ErrExpiredToken
 	}
 	return nil
 }

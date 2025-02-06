@@ -21,6 +21,9 @@ type Server struct {
 
 // NewServer creates a new HTTP server and setup routing
 func NewServer(config util.Config, store db.Store) (*Server, error) {
+
+	fmt.Printf("Server initialized with token duration: %v\n", config.AccessTokenDuration)
+
 	tokenMaker, err := token.NewPasetoMaker(config.TokenSymetricKey)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create token maker: %v", err)
@@ -54,24 +57,43 @@ func NewServer(config util.Config, store db.Store) (*Server, error) {
 }
 
 func (server *Server) setupRouter() {
-	// Add routes to the router
 	router := server.router
 
 	// Group routes under /api/v1
 	v1 := router.Group("/api/v1")
+
+	// Public routes
+	users := v1.Group("/users")
 	{
-		// Account routes
-		accounts := v1.Group("/accounts")
+		users.POST("", server.createUser)      // signup
+		users.POST("/login", server.loginUser) // login
+	}
+
+	// Routes that require authentication
+	authRoutes := v1.Group("")
+	authRoutes.Use(authMiddleware(server.tokenMaker))
+	{
+		// Protected user routes
+		authUsers := authRoutes.Group("/users")
+		{
+			authUsers.GET("/:username", server.getUser)
+			// authUsers.GET("", server.listUsers)
+			// authUsers.PUT("/:id", server.updateUser)
+			// authUsers.DELETE("/:id", server.deleteUser)
+		}
+
+		// Account routes - all protected
+		accounts := authRoutes.Group("/accounts")
 		{
 			accounts.POST("", server.createAccount)
 			accounts.GET("/:id", server.getAccount)
 			accounts.GET("", server.listAccounts)
-			accounts.PUT("/:id", server.updateAccount)
-			accounts.DELETE("/:id", server.deleteAccount)
+			// accounts.PUT("/:id", server.updateAccount)
+			// accounts.DELETE("/:id", server.deleteAccount)
 		}
 
-		// Entry routes
-		entries := v1.Group("/entries")
+		// Entry routes - all protected
+		entries := authRoutes.Group("/entries")
 		{
 			entries.POST("", server.createEntry)
 			entries.GET("/:id", server.getEntry)
@@ -80,25 +102,14 @@ func (server *Server) setupRouter() {
 			entries.DELETE("/:id", server.deleteEntry)
 		}
 
-		// Transfer routes
-		transfers := v1.Group("/transfers")
+		// Transfer routes - all protected
+		transfers := authRoutes.Group("/transfers")
 		{
 			transfers.POST("", server.createTransfer)
 			transfers.GET("/:id", server.getTransfer)
 			transfers.GET("", server.listTransfers)
 			transfers.PUT("/:id", server.updateTransfer)
 			transfers.DELETE("/:id", server.deleteTransfer)
-		}
-
-		// User routes
-		users := v1.Group("/users")
-		{
-			users.POST("", server.createUser)
-			users.POST("/login", server.loginUser)
-			users.GET("/:username", server.getUser)
-			// users.GET("", server.listusers)
-			// users.PUT("/:id", server.updateuser)
-			// users.DELETE("/:id", server.deleteuser)
 		}
 	}
 }

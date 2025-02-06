@@ -7,11 +7,13 @@ INSERT INTO transfers (from_account_id, to_account_id, amount) VALUES ($1, $2, $
 SELECT * FROM transfers WHERE id = $1;
 
 -- name: ListTransfers :many
--- List all transfers
-SELECT * FROM transfers
-ORDER BY id
-LIMIT $1
-OFFSET $2;
+SELECT t.*
+FROM transfers t
+JOIN account a ON t.from_account_id = a.id
+WHERE a.owner = $1
+ORDER BY t.id
+LIMIT $2
+OFFSET $3;
 
 -- name: UpdateTransfer :one
 UPDATE transfers

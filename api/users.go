@@ -2,6 +2,7 @@ package api
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -125,7 +126,7 @@ type loginUserResponse struct {
 
 func (server *Server) loginUser(ctx *gin.Context) {
 	var req loginUserRequest
-	if err := ctx.ShouldBindBodyWithJSON(&req); err != nil {
+	if err := ctx.ShouldBindJSON(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, errorResponse(err))
 		return
 	}
@@ -136,7 +137,6 @@ func (server *Server) loginUser(ctx *gin.Context) {
 			ctx.JSON(http.StatusNotFound, errorResponse(err))
 			return
 		}
-
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
@@ -147,6 +147,9 @@ func (server *Server) loginUser(ctx *gin.Context) {
 		return
 	}
 
+	// Add this log before token creation
+	fmt.Printf("Current time before token creation: %v\n", time.Now())
+
 	accessToken, err := server.tokenMaker.CreateToken(
 		user.Username,
 		server.config.AccessTokenDuration,
@@ -155,6 +158,9 @@ func (server *Server) loginUser(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
+
+	// Debug the token duration
+	fmt.Printf("Access token duration set to: %v\n", server.config.AccessTokenDuration)
 
 	rsp := loginUserResponse{
 		AccessToken: accessToken,

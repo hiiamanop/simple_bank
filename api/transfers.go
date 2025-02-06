@@ -2,11 +2,13 @@ package api
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	db "github.com/hiiamanop/simple_bank/db/sqlc"
+	"github.com/hiiamanop/simple_bank/token"
 )
 
 type createTransferRequest struct {
@@ -15,7 +17,6 @@ type createTransferRequest struct {
 	Amount        int64 `json:"amount" binding:"required,gt=0"`
 }
 
-// Add this structure at the top with your other type definitions
 type transferResponse struct {
 	Transfer    db.Transfer `json:"transfer"`
 	FromAccount db.Account  `json:"from_account"`
@@ -29,7 +30,10 @@ func (server *Server) createTransfer(ctx *gin.Context) {
 		return
 	}
 
-	// Validate from account exists and has sufficient balance
+	// Get the authenticated user from the context
+	authPayload := ctx.MustGet(authorizationPayloadKey).(*token.Payload)
+
+	// Validate from account exists and belongs to the authenticated user
 	fromAccount, err := server.store.GetAccount(ctx, req.FromAccountID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -37,6 +41,13 @@ func (server *Server) createTransfer(ctx *gin.Context) {
 			return
 		}
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	// Verify account ownership
+	if fromAccount.Owner != authPayload.Username {
+		err := errors.New("from account doesn't belong to the authenticated user")
+		ctx.JSON(http.StatusUnauthorized, errorResponse(err))
 		return
 	}
 
@@ -72,7 +83,6 @@ func (server *Server) createTransfer(ctx *gin.Context) {
 		return
 	}
 
-	// Execute transfer transaction
 	arg := db.TransferTxParams{
 		FromAccountID: req.FromAccountID,
 		ToAccountID:   req.ToAccountID,
@@ -104,6 +114,10 @@ func (server *Server) getTransfer(ctx *gin.Context) {
 		return
 	}
 
+	// Get the authenticated user
+	authPayload := ctx.MustGet(authorizationPayloadKey).(*token.Payload)
+
+	// Get the transfer
 	transfer, err := server.store.GetTransfers(ctx, req.ID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -111,6 +125,20 @@ func (server *Server) getTransfer(ctx *gin.Context) {
 			return
 		}
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	// Get the from account to verify ownership
+	fromAccount, err := server.store.GetAccount(ctx, transfer.FromAccountID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	// Verify the user owns either the from or to account
+	if fromAccount.Owner != authPayload.Username {
+		err := errors.New("transfer doesn't belong to the authenticated user")
+		ctx.JSON(http.StatusUnauthorized, errorResponse(err))
 		return
 	}
 
@@ -129,7 +157,10 @@ func (server *Server) listTransfers(ctx *gin.Context) {
 		return
 	}
 
+	authPayload := ctx.MustGet(authorizationPayloadKey).(*token.Payload)
+
 	arg := db.ListTransfersParams{
+		Owner:  authPayload.Username,
 		Limit:  req.PageSize,
 		Offset: (req.PageID - 1) * req.PageSize,
 	}
@@ -162,17 +193,41 @@ func (server *Server) updateTransfer(ctx *gin.Context) {
 		return
 	}
 
-	arg := db.UpdateTransferParams{
-		ID:     reqURI.ID,
-		Amount: reqBody.Amount,
-	}
+	// Get the authenticated user
+	authPayload := ctx.MustGet(authorizationPayloadKey).(*token.Payload)
 
-	transfer, err := server.store.UpdateTransfer(ctx, arg)
+	// Get the transfer to verify ownership
+	transfer, err := server.store.GetTransfers(ctx, reqURI.ID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			ctx.JSON(http.StatusNotFound, errorResponse(err))
 			return
 		}
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	// Get the from account to verify ownership
+	fromAccount, err := server.store.GetAccount(ctx, transfer.FromAccountID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	// Verify ownership
+	if fromAccount.Owner != authPayload.Username {
+		err := errors.New("transfer doesn't belong to the authenticated user")
+		ctx.JSON(http.StatusUnauthorized, errorResponse(err))
+		return
+	}
+
+	arg := db.UpdateTransferParams{
+		ID:     reqURI.ID,
+		Amount: reqBody.Amount,
+	}
+
+	transfer, err = server.store.UpdateTransfer(ctx, arg)
+	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}
@@ -190,12 +245,36 @@ func (server *Server) deleteTransfer(ctx *gin.Context) {
 		return
 	}
 
-	err := server.store.DeleteTransfers(ctx, req.ID)
+	// Get the authenticated user
+	authPayload := ctx.MustGet(authorizationPayloadKey).(*token.Payload)
+
+	// Get the transfer to verify ownership
+	transfer, err := server.store.GetTransfers(ctx, req.ID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			ctx.JSON(http.StatusNotFound, errorResponse(err))
 			return
 		}
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	// Get the from account to verify ownership
+	fromAccount, err := server.store.GetAccount(ctx, transfer.FromAccountID)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
+		return
+	}
+
+	// Verify ownership
+	if fromAccount.Owner != authPayload.Username {
+		err := errors.New("transfer doesn't belong to the authenticated user")
+		ctx.JSON(http.StatusUnauthorized, errorResponse(err))
+		return
+	}
+
+	err = server.store.DeleteTransfers(ctx, req.ID)
+	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, errorResponse(err))
 		return
 	}

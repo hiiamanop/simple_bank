@@ -30,15 +30,18 @@ func NewPasetoMaker(symmetricKey string) (Maker, error) {
 
 // CreateToken creates a new token for a specific username and duration
 func (maker *PasetoMaker) CreateToken(username string, duration time.Duration) (string, error) {
+	fmt.Printf("Creating token with duration: %v\n", duration)
+
 	payload, err := NewPayload(username, duration)
 	if err != nil {
 		return "", err
 	}
 
+	fmt.Printf("Payload created with IssuedAt: %v, ExpiredAt: %v\n", payload.IssuedAt, payload.ExpiredAt)
+
 	return maker.paseto.Encrypt(maker.symmetricKey, payload, nil)
 }
 
-// VerifyToken check if the token valid or not
 func (maker *PasetoMaker) VerifyToken(token string) (*Payload, error) {
 	payload := &Payload{}
 
@@ -47,8 +50,12 @@ func (maker *PasetoMaker) VerifyToken(token string) (*Payload, error) {
 		return nil, ErrInvalidToken
 	}
 
+	fmt.Printf("Verifying token at time: %v\n", time.Now())
+	fmt.Printf("Token payload: IssuedAt: %v, ExpiredAt: %v\n", payload.IssuedAt, payload.ExpiredAt)
+
 	err = payload.Valid()
 	if err != nil {
+		fmt.Printf("Token validation failed with error: %v\n", err)
 		return nil, err
 	}
 

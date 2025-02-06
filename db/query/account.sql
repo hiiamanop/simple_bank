@@ -9,9 +9,10 @@ SELECT * FROM account WHERE id = $1;
 -- name: ListAccounts :many
 -- List all accounts
 SELECT * FROM account
+WHERE owner = $1
 ORDER BY id
-LIMIT $1
-OFFSET $2;
+LIMIT $2
+OFFSET $3;
 
 -- name: AddAccountBalance :one
 UPDATE account
